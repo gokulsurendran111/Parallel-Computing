@@ -1,9 +1,7 @@
 import numpy as np
-from numba import njit, jitclass
-from animate import animate
+from animate import animation_run
 
 
-# @jitclass
 class Body(object):
     def __init__(self, state):
         self.state = state
@@ -27,7 +25,6 @@ class Body(object):
         return self.state[5]
 
 
-# @njit
 def Target_dynamics(dt, t, Target):
     pos = Target.pos
     vel = Target.vel
@@ -44,7 +41,6 @@ def Target_dynamics(dt, t, Target):
     return statedot
 
 
-# @njit
 def Chaser_dynamics(dt, t, Chaser):
     pos = Chaser.pos
     vel = Chaser.vel
@@ -79,6 +75,7 @@ TMAX = 20.0
 time_array = []
 Target_state_array = []
 Chaser_state_array = []
+
 while t < TMAX:
 
     Target.state = Target.state + dt*Target_dynamics(dt, t, Target)
@@ -93,4 +90,4 @@ time_array = np.asarray(time_array)
 Target_state_array = np.asarray(Target_state_array)
 Chaser_state_array = np.asarray(Chaser_state_array)
 
-animate(time_array, Target_state_array, Chaser_state_array)
+ani = animation_run(time_array, dt, Target_state_array, Chaser_state_array)
