@@ -1,6 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from numba import njit
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 
 @njit
@@ -69,33 +70,35 @@ def Chaser_body(Chaser_pos, Chaser_theta):
     return Chaser_x_coord, Chaser_y_coord
 
 
-def animate(time_array, Target_state_array, Chaser_state_array):
+# # Animation
+def animation_run(time_array, dt, Target_state_array, Chaser_state_array):
 
-    N = time_array.size
+    fig = plt.figure(figsize=(5, 4))
+    ax = fig.add_subplot(autoscale_on=False, xlim=(-2, 6), ylim=(-3, 3))
+    ax.set_aspect('equal')
+    ax.grid(True)
 
-    for i in range(0, N, 2):
-        t = time_array[i]
-        Target_pos = Target_state_array[i, 0:2]
-        Target_theta = Target_state_array[i, 4]
-        Chaser_pos = Chaser_state_array[i, 0:2]
-        Chaser_theta = Chaser_state_array[i, 4]
+    target1, = ax.plot([], [], 'o-', lw=3)
+    target2, = ax.plot([], [], 'o-', lw=1)
+    chaser, = ax.plot([], [], 'o-', lw=3)
+    time_template = 'time = %.1fs'
+    time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
 
-        Tx_coord, Ty_coord = Target_body(Target_pos, Target_theta)
-        Cx_coord, Cy_coord = Chaser_body(Chaser_pos, Chaser_theta)
+    def anime(i):
 
-        plt.cla()
-        plt.grid(True)
-        plt.title('T = ' + str(round(t, 3)) + 's')
-        plt.plot(Tx_coord[0:5], Ty_coord[0:5], 'bo-', lw=3)
-        plt.plot(Tx_coord[5:9], Ty_coord[5:9], 'bo-', lw=1)
-        plt.fill_between(Tx_coord[5:9], Ty_coord[5:9],
-                         color='blue', alpha=0.4)
+        Tx_coord, Ty_coord = Target_body(Target_state_array[i, 0:2],
+                                         Target_state_array[i, 4])
+        Cx_coord, Cy_coord = Chaser_body(Chaser_state_array[i, 0:2],
+                                         Chaser_state_array[i, 4])
 
-        plt.plot(Cx_coord[0:5], Cy_coord[0:5], 'ro-', lw=3)
-        plt.plot(Cx_coord[5:7], Cy_coord[5:7], 'ko-', lw=3)
-        plt.axis('equal')
-        plt.xlim([-2, 6])
-        plt.ylim([-3, 3])
-        plt.pause(0.01)
+        target1.set_data(Tx_coord[0:5], Ty_coord[0:5])
+        target2.set_data(Tx_coord[5:9], Ty_coord[5:9])
+        chaser.set_data(Cx_coord, Cy_coord)
+        time_text.set_text(time_template % (i*dt))
 
+        return target1, target2, chaser, time_text
+
+    ani = FuncAnimation(fig, anime, time_array.size, interval=50, blit=True)
     plt.show()
+
+    return ani
