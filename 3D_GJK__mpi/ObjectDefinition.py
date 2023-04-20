@@ -50,11 +50,12 @@ def body2(CG, q_ECI, NumConvxObjects):
 
     N = np.zeros(NumConvxObjects, dtype='int')
 
-    points_body1 = Cylinder(Radius=0.7, Height=1.0, NCirc=20, NHeight=4)
+    points_body1 = Cylinder(Radius=0.7, Height=1.0, NRadius=4, NCirc=20,
+                            NHeight=4, CG_loc=[0.0, 0.0, 0.0])
     N[0] = points_body1.shape[0]
 
-    points_body2 = Cylinder(Radius=0.1, Height=2.5, NCirc=5, NHeight=2)
-    points_body2 = points_body2 + np.array([0.0, 0.0, 0.5])
+    points_body2 = Cylinder(Radius=0.1, Height=2.0, NRadius=1, NCirc=10,
+                            NHeight=10, CG_loc=[0.0, 0.0, 1.5])
     N[1] = points_body2.shape[0]
 
     Nmax = N.max()
@@ -83,19 +84,62 @@ def body2(CG, q_ECI, NumConvxObjects):
 
 
 @njit(cache=True)
-def Cylinder(Radius, Height, NCirc, NHeight):
+def Cylinder(Radius, Height, NRadius, NCirc, NHeight, CG_loc):
 
-    points = np.zeros((NCirc*NHeight, 3))
+    points = np.zeros((NCirc*NHeight + 2*NRadius*NCirc, 3))
     k = 0
-    for h in np.linspace(0.0, Height, NHeight):
+    for h in np.linspace(-Height/2, Height/2, NHeight):
         t = np.linspace(0.0, 2*np.pi, NCirc)
-        x = Radius*np.cos(t)
-        y = Radius*np.sin(t)
-        z = h + np.zeros_like(x)
-        points[k*NCirc:(k+1)*NCirc, :] = np.vstack((x,y,z)).T
+        x = CG_loc[0] + Radius*np.cos(t)
+        y = CG_loc[1] + Radius*np.sin(t)
+        z = CG_loc[2] + h + np.zeros_like(x)
+        points[k*NCirc:(k+1)*NCirc, :] = np.vstack((x, y, z)).T
         k += 1
 
-    return points
+    if NRadius > 1:
+        delta = Radius/NRadius
+        for r in np.linspace(delta, Radius-delta, NRadius-1):
+            t = np.linspace(0.0, 2*np.pi, NCirc)
+            x = CG_loc[0] + r*np.cos(t)
+            y = CG_loc[1] + r*np.sin(t)
+            z = CG_loc[2] + Height/2 + np.zeros_like(x)
+            points[k*NCirc:(k+1)*NCirc, :] = np.vstack((x, y, z)).T
+            k += 1
+
+        for r in np.linspace(delta, Radius-delta, NRadius-1):
+            t = np.linspace(0.0, 2*np.pi, NCirc)
+            x = CG_loc[0] + r*np.cos(t)
+            y = CG_loc[1] + r*np.sin(t)
+            z = CG_loc[2] + -Height/2 + np.zeros_like(x)
+            points[k*NCirc:(k+1)*NCirc, :] = np.vstack((x, y, z)).T
+            k += 1
+
+    return points[:k*NCirc, :]
+
+
+def SeeBody():
+    cg = np.zeros(3)
+    qeci = np.zeros(4)
+    qeci[0] = 1.0
+    B2_points_ECI, B2_N = body1(cg, qeci, 1)
+    print(B2_N)
+
+    B2 = []
+    B2p = []
+    for obj in range(B2_N.size):
+        hull = ConvexHull(B2_points_ECI[obj, 0:B2_N[obj]])
+        x, y, z = np.split(B2_points_ECI[obj, 0:B2_N[obj]], 3, axis=1)
+        B2.append(mlab.triangular_mesh(x, y, z, hull.simplices,
+                                       colormap='YlGn'))
+        B2p.append(mlab.points3d(x, y, z, scale_factor=0.05))
+
+    mlab.show()
+
+
+if __name__ == '__main__':
+    from mayavi import mlab
+    from scipy.spatial import ConvexHull
+    SeeBody()
 # --------------------------
 # Object Design Dictionary
 # --------------------------
