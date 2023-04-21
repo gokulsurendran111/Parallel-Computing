@@ -67,7 +67,7 @@ if rank == 0:
     t_col_arr.append(t_col)
     
     clos_dist_arr = []
-    clos_dist_arr.append(clos_dist_arr)
+    clos_dist_arr.append(clos_dist)
     
     flag_B1_B2_arr = []
     flag_B1_B2_arr.append(np.floor(flag_B1_B2))
@@ -85,7 +85,7 @@ if rank == 0:
         temp2 = comm.recv(source=irank, tag=irank+NPROC)
         clos_dist_arr.append(temp2)
         
-        temp3 = np.zeros((1,2))
+        temp3 = np.zeros((3,)).T
         comm.Recv(temp3, source = irank, tag=irank+2*NPROC)
         flag_B1_B2_arr.append(np.floor(temp3))
         
@@ -99,6 +99,21 @@ if rank == 0:
     
     t_anim = min(t_col_arr)
     id = t_col_arr.index(t_anim)
+
+    t_sort_arr1 = []
+    for si in range(0, NPROC):
+        t_sort_arr1.append(flag_B1_B2_arr[si][2]) 
+
+    t_sort_arr2 = []    
+    t_sort_arr2.append(t_sort_arr1)
+    t_sort_arr2.append(clos_dist_arr)
+    
+    t_sort_arr3 = np.transpose(t_sort_arr2)
+    t_sort_arr4 = sorted(t_sort_arr3, key=lambda i: i[0])
+
+    clos_dist_sorted = np.array([])
+    for si2 in range(id+1):
+        clos_dist_sorted = np.concatenate((clos_dist_sorted, t_sort_arr4[si2][1]))
     
     if t_anim == np.inf:
         print('No Collision Detected')
@@ -108,9 +123,9 @@ if rank == 0:
         print("Final Closest Points index in ECI frame:")
         clos_dist_points = clos_dist_info_arr[id]
         sub_body = flag_B1_B2_arr[id]
-        print("Points ", clos_dist_points[:,1], " in Body 1 - subbody ", sub_body[0][0]+1,
-              " are close to points ", clos_dist_points[:,2], " in Body 2 - subbody ", 
-              sub_body[0][1]+1, " respectively.")
+        print("Points ", clos_dist_points[:,1], " in Body 1 - sub-body ", sub_body[0]+1,
+              " are close to points ", clos_dist_points[:,2], " in Body 2 - sub-body ", 
+              sub_body[1]+1, " respectively.")
 
     t3 = time.perf_counter()
     print(" ")
@@ -120,6 +135,14 @@ if rank == 0:
 
     # Animation ---------------
     time_animation = time_ar[time_ar <= t_anim + dt]
+    
+    plot_len = time_animation.shape[0]
+    plt.figure(1)
+    plt.plot(time_animation[0:-1], clos_dist_sorted)
+    plt.xlabel('Time, s')
+    plt.ylabel('Closest Distance, m')
+    plt.grid()
+    plt.show()
     
     animate(time_animation, Target_states, Chaser_states,
             Target, Chaser)
@@ -153,4 +176,3 @@ else:
     comm.Send(flag_B1_B2, dest = 0, tag=rank + 2*NPROC)
     comm.send(id_clos, dest = 0, tag=rank + 3*NPROC)
     comm.Send(clos_dist_info, dest = 0, tag=rank + 4*NPROC)
-   
