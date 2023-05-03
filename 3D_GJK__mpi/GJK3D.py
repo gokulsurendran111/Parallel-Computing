@@ -7,12 +7,13 @@ import scipy.spatial as sp
 def collison_check(time_array, Target_state_array, Chaser_state_array,
                    Target_Num, Chaser_Num):
 
-    distance_B1_B2 = 1e8
-    closest_dist_array = np.array([])
-    
+    closest_dist_array = np.inf*np.ones(time_array.size)
+    indices_B1_B2_array = -1*np.ones((time_array.size, 4), dtype='int')
+
     for i in range(time_array.size):
 
         t = time_array[i]
+        closest_distance = np.inf
         # print("Solving For Time ", t)
 
         CG_b1 = Target_state_array[i, 0:3]
@@ -26,25 +27,28 @@ def collison_check(time_array, Target_state_array, Chaser_state_array,
         for ii in range(0, Target_Num):
             Target_shape = B1_points_ECI[ii, 0:B1_N[ii], :]
             for jj in range(0, Chaser_Num):
-                Chaser_shape = B2_points_ECI[jj, 0:B2_N[ii], :]
+                Chaser_shape = B2_points_ECI[jj, 0:B2_N[jj], :]
 
-                out, closest_dist_info = isCollide(Target_shape, Chaser_shape)
-                closest_distance = closest_dist_info[0, 0]
-                flag_B1_B2 = np.array([ii, jj, t])
-                
-                if closest_distance <= distance_B1_B2:
-                    distance_B1_B2 = closest_distance
-                    
+                out, distance_info = isCollide(Target_shape, Chaser_shape)
+                distance_SB1_SB2 = distance_info[0]
+                ind_point_SB1 = int(distance_info[1])
+                ind_point_SB2 = int(distance_info[2])
+
+                if distance_SB1_SB2 <= closest_distance:
+                    closest_distance = distance_SB1_SB2
+                    indices_B1_B2 = np.array([ii, jj, ind_point_SB1,
+                                              ind_point_SB2])
+
                 if out == 1:
-                    # print('Collision detected at ', t, ' s')
-                    closest_dist_array = np.append(closest_dist_array, 
-                                                   distance_B1_B2)
-                    return t, closest_dist_array, closest_dist_info, flag_B1_B2, closest_dist_info.shape[0]
+                    closest_dist_array[i] = 0.0
+                    indices_B1_B2_array[i] = indices_B1_B2
+                    return t, closest_dist_array, indices_B1_B2_array
 
-        closest_dist_array = np.append(closest_dist_array, distance_B1_B2)
+        closest_dist_array[i] = closest_distance
+        indices_B1_B2_array[i] = indices_B1_B2
+
     if i == time_array.size-1:
-        # print('No Collision detected')
-        return np.inf, closest_dist_array, closest_dist_info, flag_B1_B2, closest_dist_info.shape[0]
+        return np.inf, closest_dist_array, indices_B1_B2_array
 
 
 # a and b are shapes' coordinates
@@ -54,35 +58,23 @@ def minkowskiDiff(a, b):  # a and b denote points in the 2 bodies
     b_len = b.shape[0]
 
     mDiff = np.zeros((a_len*b_len, 3))
-    
-    dist_array = np.array([0, 0, 0], dtype=np.float64).reshape(1,3)
-    
+    dist_array = np.zeros((a_len*b_len, 3))
+
     k = 0
     for i in range(a_len):
         for j in range(b_len):
             mDiff[k, 0] = a[i, 0] - b[j, 0]
             mDiff[k, 1] = a[i, 1] - b[j, 1]
             mDiff[k, 2] = a[i, 2] - b[j, 2]
-            dist_from_origin = np.sqrt((mDiff[k, 0])**2 + (mDiff[k, 1])**2 + 
-                                        (mDiff[k, 2])**2)
-            dist_info = np.array([dist_from_origin, i, j]).reshape(1,3)
-            dist_array = np.concatenate((dist_array,dist_info), axis=0)
-            
+            dist_from_origin = np.linalg.norm(mDiff[k, :])
+            dist_info = np.array([dist_from_origin, i, j])
+            dist_array[k] = dist_info
             k += 1
 
-    dist_array = dist_array[1:, :]
-
-    temp = (dist_array[:, 0]).min()
-    dist_index = np.array([0], dtype=np.int64)
-    for i in range(dist_array.shape[0]):
-        if dist_array[i, 0] == temp:
-            dist_index = np.append(dist_index, i)
-    dist_index = dist_index[1:]
-
-    closest_dist_info = dist_array[dist_index, :]
+    smallest_dist_index = np.argmin(dist_array[:, 0])
+    closest_dist_info = dist_array[smallest_dist_index, :]
 
     return mDiff, closest_dist_info
-# for 3D bodies, mDiff is an array of size (a_len*b_len, 3)
 
 
 @njit(cache=True)
